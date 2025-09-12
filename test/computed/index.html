@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+  </head>
+  <body>
+    <script type="module">
+      import { createProxy, effect } from "../../effect.js";
+      import computed from "../../computed.js";
+      const obj = {
+        count: 0,
+      };
+
+      const proxyObj = createProxy(obj);
+
+      const result = computed(() => proxyObj.count + 1);
+
+      effect(() => {
+        console.log("访问计算属性的effect函数", result.value);
+      });
+
+      setTimeout(() => {
+        proxyObj.count = 2;
+      }, 1000);
+    </script>
+  </body>
+</html>
