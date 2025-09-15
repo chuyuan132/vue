@@ -22,6 +22,7 @@ const defaultOptions = {
 const TriggerType = {
   ADD: "add",
   SET: "set",
+  DELETE: "delete",
 };
 
 /**
@@ -112,7 +113,7 @@ function trigger(target, key) {
   // 为什么需要新开一个Set呢，因为在遍历deps的时候，执行effectFn函数时会执行【清除依赖，执行fn依赖收集】，始终对同一个set操作，会死循环
   const newSet = new Set();
 
-  if (type === TriggerType.ADD) {
+  if ([TriggerType.ADD, TriggerType.DELETE].includes(type)) {
     let iterateEffects = depsMap.get(TRACK_KEY);
     iterateEffects &&
       iterateEffects.forEach((fn) => {
@@ -172,6 +173,14 @@ function createProxy(obj) {
     ownKeys(target) {
       track(target, TRACK_KEY);
       return Reflect.ownKeys(target);
+    },
+    deleteProperty(target, key) {
+      const hadKey = Object.prototype.hasOwnProperty.call(target, key);
+      const res = Reflect.deleteProperty(target, key);
+      if (res && hadKey) {
+        trigger(target, key, TriggerType.DELETE);
+      }
+      return res;
     },
   });
 }
