@@ -14,11 +14,23 @@ let activeEffect = null;
  */
 const effectStack = [];
 
-
 const defaultOptions = {
   scheduler: null,
   lazy: false,
 };
+
+const TriggerType = {
+  ADD: "add",
+  SET: "set",
+};
+
+/**
+ * 将fn包装成一个副作用函数，在目标函数执行上下文加入自定义的逻辑
+ * @param fn
+ * @param options
+ * @returns {function(): *}
+ */
+const TRACK_KEY = Symbol();
 
 /**
  * 将fn包装成一个副作用函数，在目标函数执行上下文加入自定义的逻辑
@@ -50,6 +62,10 @@ function effect(fn, options = defaultOptions) {
  * 副作用清理函数
  * @param effectFn
  */
+/**
+ * 副作用清理函数
+ * @param effectFn
+ */
 function clean(effectFn) {
   for (let i = 0; i < effectFn.deps.length; i++) {
     const deps = effectFn.deps[i];
@@ -59,6 +75,11 @@ function clean(effectFn) {
   effectFn.deps.length = 0;
 }
 
+/**
+ * 依赖收集，核心是通过activeEffect全局变量来实现的
+ * @param target
+ * @param key
+ */
 /**
  * 依赖收集，核心是通过activeEffect全局变量来实现的
  * @param target
@@ -87,8 +108,26 @@ function trigger(target, key) {
   let depsMap = bucket.get(target);
   if (!depsMap) return;
   let deps = depsMap.get(key);
+
   // 为什么需要新开一个Set呢，因为在遍历deps的时候，执行effectFn函数时会执行【清除依赖，执行fn依赖收集】，始终对同一个set操作，会死循环
-  const newSet = new Set(deps);
+  const newSet = new Set();
+
+  if (type === TriggerType.ADD) {
+    let iterateEffects = depsMap.get(TRACK_KEY);
+    iterateEffects &&
+      iterateEffects.forEach((fn) => {
+        if (fn !== activeEffect) {
+          newSet.add(fn);
+        }
+      });
+  }
+
+  deps &&
+    deps.forEach((dep) => {
+      if (fn !== activeEffect) {
+        newSet.add(dep);
+      }
+    });
   newSet &&
     newSet.forEach((fn) => {
       // 为什么需要加以下判断呢？试想以下执行effectFn时，同时存在属性的读写，会导致死循环
@@ -107,16 +146,32 @@ function trigger(target, key) {
  * @param obj
  * @returns {*|object|boolean}
  */
+/**
+ * 创建proxy对象代理
+ * @param obj
+ * @returns {*|object|boolean}
+ */
 function createProxy(obj) {
   return new Proxy(obj, {
-    get(target, key) {
+    get(target, key, receiver) {
       track(target, key);
-      return target[key];
+      return Reflect.get(target, key, receiver);
     },
-    set(target, key, value) {
-      target[key] = value;
-      trigger(target, key);
+    set(target, key, value, receiver) {
+      const type = Object.prototype.hasOwnProperty.call(target, key)
+        ? TriggerType.SET
+        : TriggerType.ADD;
+      Reflect.set(target, key, value, receiver);
+      trigger(target, key, type);
       return true;
+    },
+    has(target, key) {
+      track(target, key);
+      return Reflect.has(target, key);
+    },
+    ownKeys(target) {
+      track(target, TRACK_KEY);
+      return Reflect.ownKeys(target);
     },
   });
 }

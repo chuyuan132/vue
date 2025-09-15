@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+  </head>
+  <body>
+    <script type="module">
+      import { effect, createProxy } from "../../effect.js";
+      // 原本的effect逻辑，由于最终访问的是obj.foo, 不是代理对象，因此无法触发响应，使用Releft可以解决
+      // const obj = {
+      //   foo: 1,
+      //   get bar() {
+      //     return this.foo;
+      //   },
+      // };
+
+      // const proxyObj = createProxy(obj);
+
+      // effect(() => {
+      //   console.log(proxyObj.bar);
+      // });
+
+      // setTimeout(() => {
+      //   proxyObj.foo = 2;
+      // }, 1000);
+
+      const obj = {
+        foo: 1,
+      };
+
+      const proxyObj = createProxy(obj);
+
+      effect(() => {
+        for (let key in proxyObj) {
+          console.log(key, proxyObj[key]);
+        }
+      });
+
+      setTimeout(() => {
+        proxyObj.name = "ikun";
+      }, 1000);
+    </script>
+  </body>
+</html>
